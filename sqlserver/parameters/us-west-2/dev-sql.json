@@ -1,7 +1,7 @@
 [
     {
         "ParameterKey": "AllocatedStorage",
-        "ParameterValue": "20"
+        "ParameterValue": "200"
     },
     {
         "ParameterKey": "AllowMajorVersionUpgrade",
@@ -17,11 +17,11 @@
     },
     {
         "ParameterKey": "DBInstanceClass",
-        "ParameterValue": "db.t2.medium"
+        "ParameterValue": "db.m4.xlarge"
     },
     {
-        "ParameterKey": "DBName",
-        "ParameterValue": "dbtest"
+        "ParameterKey": "Engine",
+        "ParameterValue": "sqlserver-se"
     },
     {
         "ParameterKey": "DBSubnetGroupName",
@@ -40,16 +40,16 @@
         "ParameterValue": "true"
     },
     {
-        "ParameterKey": "SSMParameterName",
-        "ParameterValue": "RDSMasterPassword"
-    },
-    {
         "ParameterKey": "IAMRoleName",
         "ParameterValue": "RDS-Starter-Template-LambdaExecutionRole"
     },
     {
         "ParameterKey": "IAMManagedPolicyName",
         "ParameterValue": "GrantUsageKMSKey"
+    },
+    {
+        "ParameterKey": "RDSInstanceTemplateURL",
+        "ParameterValue": "https://s3-us-west-2.amazonaws.com/pavelyarema-public/sqlserver-rds-instance.yml"
     }
     
 ]

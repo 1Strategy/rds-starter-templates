@@ -21,7 +21,7 @@ Parameters:
     Description: The allocated storage size, specified in gigabytes (GB).
     Type: String
     AllowedPattern: "^([2-9]?[0-9]{1}|[0-9]{3,4}|1[0-5]?[0-9]{3}|16[0-2]?[0-9]{2}|163[0-7]?[0-9]{1}|1638[0-4]?)$"
-    ConstraintDescription: "Value must be a valid number between 20-16384."
+    ConstraintDescription: "For SQL Server Express or Web Edition, the value must be a valid number between 20-16384. For SQL Server Standard or Enteprise editions, the value must be a valid number between 200 and 16384"
   
   AllowMajorVersionUpgrade:
     Description: If you update the EngineVersion property to a version that's different from the DB instance's current major version, set this property to true.
@@ -47,15 +47,11 @@ Parameters:
     Type: String
     Default: db.t2.medium
     
-  DBName:
-    Description: The name of the database inside the instance.
-    Type: String
-  
   Engine:
     Description: The name of the database engine to be used for this instance.
     Type: String
-    AllowedValues: [mysql, mariadb, postgres]
-    ConstraintDescription: "Please specify either a mysql, mariadb, or postgres engine for the RDS instance."
+    AllowedValues: [sqlserver-ee, sqlserver-se, sqlserver-ex, sqlserver-web]
+    ConstraintDescription: "Please specify either a sqlserver-ee, sqlserver-se, sqlserver-ex, or sqlserver-web engine for the RDS instance."
 
   DBSubnetGroupName:
     Description: A DB subnet group to associate with the DB instance. 
@@ -74,7 +70,7 @@ Parameters:
     Description: The master password for the DB instance.
     Type: String
     NoEcho: true
-
+  
   MultiAZ:
     Description: Specifies if the database instance is a multiple Availability Zone deployment.
     Type: String
@@ -82,10 +78,13 @@ Parameters:
     Default: true
     ConstraintDescription: "Value must be boolean value."
 
-
+Conditions: 
+  CreateSQLServerEnterpriseOrStandardResources: !Or  [!Equals [ !Ref Engine ,  sqlserver-ee], !Equals [ !Ref Engine ,  sqlserver-se]]
+  CreateSQLServerExpressOrWebResources: !Not [!Or  [!Equals [ !Ref Engine ,  sqlserver-ee], !Equals [ !Ref Engine ,  sqlserver-se]]]
 Resources:  
-  RDSInstance:
+  SQLServerInstanceHigherEditions:
     Type: "AWS::RDS::DBInstance"
+    Condition: CreateSQLServerEnterpriseOrStandardResources
     Properties:
       AllocatedStorage: !Ref AllocatedStorage
       AllowMajorVersionUpgrade: !Ref AllowMajorVersionUpgrade
@@ -93,48 +92,103 @@ Resources:
       BackupRetentionPeriod:  !Ref BackupRetentionPeriod
       CopyTagsToSnapshot: true
       DBInstanceClass: !Ref DBInstanceClass
-      DBName: !Ref DBName
       Engine: !Ref Engine
+      LicenseModel: license-included
       DBSubnetGroupName: !Ref DBSubnetGroupName
       VPCSecurityGroups: !Ref VPCSecurityGroups
       MasterUsername: !Ref MasterUsername
       MasterUserPassword: !Ref MasterUserPassword
-      MonitoringInterval: 0 #Not using enhanced monitoring. Regular RDS monitoring is still enabled.
       MultiAZ: !Ref MultiAZ
+      MonitoringInterval: 0 #Not using enhanced monitoring. Regular RDS monitoring is still enabled.
       PubliclyAccessible: false 
       StorageType: gp2
       Tags:
         - Key: Name
           Value: !Sub
             - ${AWS::StackName}-${Name}
-            - { Name: !Ref DBName }
+            - { Name: !Ref Engine }
+ 
+  SQLServerInstanceLowerEditions:
+    Type: "AWS::RDS::DBInstance"
+    Condition: CreateSQLServerExpressOrWebResources
+    Properties:
+      AllocatedStorage: !Ref AllocatedStorage
+      AllowMajorVersionUpgrade: !Ref AllowMajorVersionUpgrade
+      AutoMinorVersionUpgrade: !Ref AutoMinorVersionUpgrade
+      BackupRetentionPeriod:  !Ref BackupRetentionPeriod
+      CopyTagsToSnapshot: true
+      DBInstanceClass: !Ref DBInstanceClass
+      Engine: !Ref Engine
+      LicenseModel: license-included
+      DBSubnetGroupName: !Ref DBSubnetGroupName
+      VPCSecurityGroups: !Ref VPCSecurityGroups
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterUserPassword
+      MonitoringInterval: 0 #Not using enhanced monitoring. Regular RDS monitoring is still enabled.
+      PubliclyAccessible: false 
+      StorageType: gp2
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - ${AWS::StackName}-${Name}
+            - { Name: !Ref Engine }
 
 
 
 Outputs:
-  DBInstanceIdentifier:
+  DBInstanceIdentifierHigherEditions:
     Description: The database instance identifier
-    Value: !Ref RDSInstance
+    Value: !Ref SQLServerInstanceHigherEditions
+    Condition: CreateSQLServerEnterpriseOrStandardResources
     Export:
       Name: !Sub 
-      - "${AWS::StackName}-${engine}-${Name}-identifier"
-      - { Name: !Ref DBName, engine: !Ref Engine }
+      - "${AWS::StackName}-${engine}-identifier"
+      - {engine: !Ref Engine }
 
-  DBEndpoint:
+  DBEndpointHigherEditions:
     Description: The connection endpoint for the database.
-    Value: !GetAtt  RDSInstance.Endpoint.Address
+    Value: !GetAtt  SQLServerInstanceHigherEditions.Endpoint.Address
+    Condition: CreateSQLServerEnterpriseOrStandardResources
     Export:
       Name: !Sub 
-        - "${AWS::StackName}-${engine}-${Name}-endpoint"
-        - { Name: !Ref DBName, engine: !Ref Engine }
+        - "${AWS::StackName}-${engine}-endpoint"
+        - {engine: !Ref Engine }
 
-  DBPort:
+  DBPortHigherEditions:
     Description: The port number on which the database accepts connections.
-    Value: !GetAtt  RDSInstance.Endpoint.Port
+    Value: !GetAtt  SQLServerInstanceHigherEditions.Endpoint.Port
+    Condition: CreateSQLServerEnterpriseOrStandardResources
     Export:
       Name: !Sub 
-        - "${AWS::StackName}-${engine}-${Name}-port"
-        - { Name: !Ref DBName, engine: !Ref Engine }
+        - "${AWS::StackName}-${engine}-port"
+        - {engine: !Ref Engine }
+
+  DBInstanceIdentifierLowerEditions:
+    Description: The database instance identifier
+    Value: !Ref SQLServerInstanceLowerEditions
+    Condition: CreateSQLServerExpressOrWebResources
+    Export:
+      Name: !Sub 
+      - "${AWS::StackName}-${engine}-identifier"
+      - {engine: !Ref Engine }
+
+  DBEndpointLowerEditions:
+    Description: The connection endpoint for the database.
+    Value: !GetAtt  SQLServerInstanceLowerEditions.Endpoint.Address
+    Condition: CreateSQLServerExpressOrWebResources
+    Export:
+      Name: !Sub 
+        - "${AWS::StackName}-${engine}-endpoint"
+        - {engine: !Ref Engine }
+
+  DBPortLowerEditions:
+    Description: The port number on which the database accepts connections.
+    Value: !GetAtt  SQLServerInstanceLowerEditions.Endpoint.Port
+    Condition: CreateSQLServerExpressOrWebResources
+    Export:
+      Name: !Sub 
+        - "${AWS::StackName}-${engine}-port"
+        - {engine: !Ref Engine }
 
 
 

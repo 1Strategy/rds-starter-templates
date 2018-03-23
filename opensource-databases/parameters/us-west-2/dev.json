@@ -1,5 +1,9 @@
 [
     {
+        "ParameterKey": "AllocatedStorage",
+        "ParameterValue": "20"
+    },
+    {
         "ParameterKey": "AllowMajorVersionUpgrade",
         "ParameterValue": "false"
     },
@@ -17,15 +21,11 @@
     },
     {
         "ParameterKey": "DBName",
-        "ParameterValue": "DBTest"
-    },
-    {
-        "ParameterKey": "DBClusterIdentifier",
-        "ParameterValue": "auroratest"
+        "ParameterValue": "dbtest"
     },
     {
         "ParameterKey": "Engine",
-        "ParameterValue": "aurora-mysql"
+        "ParameterValue": "mysql"
     },
     {
         "ParameterKey": "DBSubnetGroupName",
@@ -40,8 +40,24 @@
         "ParameterValue": "Pavel"
     },
     {
-        "ParameterKey": "MasterUserPassword",
-        "ParameterValue": "NotSecure"
+        "ParameterKey": "MultiAZ",
+        "ParameterValue": "true"
+    },
+    {
+        "ParameterKey": "SSMParameterName",
+        "ParameterValue": "RDSMasterPassword"
+    },
+    {
+        "ParameterKey": "IAMRoleName",
+        "ParameterValue": "RDS-Starter-Template-LambdaExecutionRole"
+    },
+    {
+        "ParameterKey": "IAMManagedPolicyName",
+        "ParameterValue": "GrantUsageKMSKey"
+    },
+    {
+        "ParameterKey": "RDSInstanceTemplateURL",
+        "ParameterValue": "https://s3-us-west-2.amazonaws.com/pavelyarema-public/opensource-rds-instance.yml"
     }
     
 ]

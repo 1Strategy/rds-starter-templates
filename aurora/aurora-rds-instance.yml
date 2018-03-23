@@ -44,12 +44,12 @@ Parameters:
     Default: db.t2.medium
     
   DBName:
-    Description: The name of the DB instance that was provided at the time of creation, if one was specified. This same name is returned for the life of the DB instance.
+    Description: The name of the database inside the instance.
     Type: String
   
   
   DBClusterIdentifier:
-    Description: The name of the DB instance that was provided at the time of creation, if one was specified. This same name is returned for the life of the DB instance.
+    Description: Name of the database cluster.
     Type: String
     AllowedPattern: "^[([a-z]|\\d|\\-)]{1,63}$"
     ConstraintDescription: "DBClusterIdentifier can only contain lowercase letters, numbers, and/or hypen."
@@ -78,12 +78,6 @@ Parameters:
     Type: String
     NoEcho: true
 
-  # MultiAZ:
-  #   Description: Specifies if the database instance is a multiple Availability Zone deployment.
-  #   Type: String
-  #   AllowedValues: [true, false]
-  #   Default: true
-  #   ConstraintDescription: "Value must be boolean value."
 
 Mappings:
   ParameterGroupMapping:
@@ -122,7 +116,6 @@ Resources:
       DBClusterIdentifier: !Ref RDSDBCluster
       Engine: !Ref Engine
       DBSubnetGroupName: !Ref DBSubnetGroupName
-      # MultiAZ: !Ref MultiAZ
       PubliclyAccessible: false 
       Tags:
         - Key: Name
@@ -140,7 +133,6 @@ Resources:
       DBClusterIdentifier: !Ref RDSDBCluster
       Engine: !Ref Engine
       DBSubnetGroupName: !Ref DBSubnetGroupName
-      # MultiAZ: !Ref MultiAZ
       PubliclyAccessible: false 
       Tags:
         - Key: Name
@@ -152,30 +144,55 @@ Resources:
 
 
 
-#Outputs:
-  # DBInstanceIdentifier:
-  #   Description: The database instance identifier
-  #   Value: !Ref RDSInstance
-  #   Export:
-  #     Name: !Sub 
-  #     - "${AWS::StackName}-${engine}-${Name}-identifier"
-  #     - { Name: !Ref DBName, engine: !Ref Engine }
+Outputs:
+  DBInstanceIdentifier:
+    Description: The database instance identifier
+    Value: !Ref RDSInstance
+    Export:
+      Name: !Sub 
+      - "${AWS::StackName}-${engine}-${Name}-identifier"
+      - { Name: !Ref DBName, engine: !Ref Engine }
 
-  # DBEndpoint:
-  #   Description: The connection endpoint for the database.
-  #   Value: !GetAtt  RDSInstance.Endpoint.Address
-  #   Export:
-  #     Name: !Sub 
-  #       - "${AWS::StackName}-${engine}-${Name}-endpoint"
-  #       - { Name: !Ref DBName, engine: !Ref Engine }
+  DBEndpoint:
+    Description: The connection endpoint for the database.
+    Value: !GetAtt  RDSInstance.Endpoint.Address
+    Export:
+      Name: !Sub 
+        - "${AWS::StackName}-${engine}-${Name}-endpoint"
+        - { Name: !Ref DBName, engine: !Ref Engine }
 
-  # DBPort:
-  #   Description: The port number on which the database accepts connections.
-  #   Value: !GetAtt  RDSInstance.Endpoint.Port
-  #   Export:
-  #     Name: !Sub 
-  #       - "${AWS::StackName}-${engine}-${Name}-port"
-  #       - { Name: !Ref DBName, engine: !Ref Engine }
+  DBPort:
+    Description: The port number on which the database accepts connections.
+    Value: !GetAtt  RDSInstance.Endpoint.Port
+    Export:
+      Name: !Sub 
+        - "${AWS::StackName}-${engine}-${Name}-port"
+        - { Name: !Ref DBName, engine: !Ref Engine }
+  
+  
+  RRInstanceIdentifier:
+    Description: The database instance identifier
+    Value: !Ref RDSInstance2
+    Export:
+      Name: !Sub 
+      - "${AWS::StackName}-${engine}-${Name}-readreplica-identifier"
+      - { Name: !Ref DBName, engine: !Ref Engine }
+
+  RREndpoint:
+    Description: The connection endpoint for the database.
+    Value: !GetAtt  RDSInstance2.Endpoint.Address
+    Export:
+      Name: !Sub 
+        - "${AWS::StackName}-${engine}-${Name}-readreplica-endpoint"
+        - { Name: !Ref DBName, engine: !Ref Engine }
+
+  RRPort:
+    Description: The port number on which the database accepts connections.
+    Value: !GetAtt  RDSInstance2.Endpoint.Port
+    Export:
+      Name: !Sub 
+        - "${AWS::StackName}-${engine}-${Name}-readreplica-port"
+        - { Name: !Ref DBName, engine: !Ref Engine }
 
 
 
