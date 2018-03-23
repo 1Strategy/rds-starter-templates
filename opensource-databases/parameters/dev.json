@@ -1,0 +1,55 @@
+[
+    {
+        "ParameterKey": "AllocatedStorage",
+        "ParameterValue": "20"
+    },
+    {
+        "ParameterKey": "AllowMajorVersionUpgrade",
+        "ParameterValue": "false"
+    },
+    {
+        "ParameterKey": "AutoMinorVersionUpgrade",
+        "ParameterValue": "true"
+    },
+    {
+        "ParameterKey": "BackupRetentionPeriod",
+        "ParameterValue": "1"
+    },
+    {
+        "ParameterKey": "DBInstanceClass",
+        "ParameterValue": "db.t2.medium"
+    },
+    {
+        "ParameterKey": "DBName",
+        "ParameterValue": "dbtest"
+    },
+    {
+        "ParameterKey": "DBSubnetGroupName",
+        "ParameterValue": "default-vpc-85fe97e3"
+    },
+    {
+        "ParameterKey": "VPCSecurityGroups",
+        "ParameterValue": "sg-dfca07a2, sg-a7c805da"
+    },
+    {
+        "ParameterKey": "MasterUsername",
+        "ParameterValue": "Pavel"
+    },
+    {
+        "ParameterKey": "MultiAZ",
+        "ParameterValue": "true"
+    },
+    {
+        "ParameterKey": "SSMParameterName",
+        "ParameterValue": "RDSMasterPassword"
+    },
+    {
+        "ParameterKey": "IAMRoleName",
+        "ParameterValue": "RDS-Starter-Template-LambdaExecutionRole"
+    },
+    {
+        "ParameterKey": "IAMManagedPolicyName",
+        "ParameterValue": "GrantUsageKMSKey"
+    }
+    
+]
