@@ -1,0 +1,270 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This template allows to provision RDS instances securely by creating
+  an encrypted SSM parameter to store the RDS instance password. The password is randomly
+  generated using a lambda function.
+Parameters:
+  AllocatedStorage:
+    AllowedPattern: ^([2-9]?[0-9]{1}|[0-9]{3,4}|1[0-5]?[0-9]{3}|16[0-2]?[0-9]{2}|163[0-7]?[0-9]{1}|1638[0-4]?)$
+    ConstraintDescription: Value must be a valid number between 20-16384.
+    Description: The allocated storage size, specified in gigabytes (GB).
+    Type: String
+  AllowMajorVersionUpgrade:
+    AllowedValues:
+    - true
+    - false
+    ConstraintDescription: Value must be boolean value.
+    Description: If you update the EngineVersion property to a version that's different
+      from the DB instance's current major version, set this property to true.
+    Type: String
+  AutoMinorVersionUpgrade:
+    AllowedValues:
+    - true
+    - false
+    ConstraintDescription: Value must be boolean value.
+    Default: true
+    Description: Indicates that minor engine upgrades are applied automatically to
+      the DB instance during the maintenance window. The default value is true.
+    Type: String
+  BackupRetentionPeriod:
+    AllowedPattern: ^[0-9]{1,3}$
+    ConstraintDescription: Value must be a valid number between 0-999.
+    Description: The number of days during which automatic DB snapshots are retained.
+    Type: String
+  DBInstanceClass:
+    Default: db.t2.medium
+    Description: The name of the compute and memory capacity classes of the DB instance.
+    Type: String
+  DBName:
+    Description: The name of the database inside the instance.
+    Type: String
+  DBSubnetGroupName:
+    Description: A DB subnet group to associate with the DB instance.
+    Type: String
+  Engine:
+    AllowedValues:
+    - mysql
+    - mariadb
+    - postgres
+    ConstraintDescription: Please specify either a mysql, mariadb, or postgres engine
+      for the RDS instance.
+    Description: The name of the database engine to be used for this instance.
+    Type: String
+  IAMManagedPolicyName:
+    Description: Name of the IAM policy that will be created that allows users to
+      decrypt SSM RDS Master password parameter.
+    Type: String
+  IAMRoleName:
+    Default: RDS-Starter-Template-LambdaExecutionRole
+    Description: Name of the IAM Role that should be used when creating the IAM Role
+      that Lambda functions will be assuming
+    Type: String
+  MasterUsername:
+    Description: The master user name for the DB instance.
+    Type: String
+  MultiAZ:
+    AllowedValues:
+    - true
+    - false
+    ConstraintDescription: Value must be boolean value.
+    Default: true
+    Description: Specifies if the database instance is a multiple Availability Zone
+      deployment.
+    Type: String
+  SSMParameterName:
+    Default: RDSMasterPassword
+    Description: Parameter name under which to store the master password for the RDS
+      instace.
+    Type: String
+  VPCSecurityGroups:
+    ConstraintDescription: Please provide valid ids for the security group(s).
+    Description: Specifies if the database instance is a multiple Availability Zone
+      deployment.
+    Type: String
+Resources:
+  EncryptionKey:
+    Properties:
+      Description: KMS Key to encrypt SSM Parameter that include RDS master passwords.
+      Enabled: true
+      KeyPolicy:
+        Id: key-default-1
+        Statement:
+        - Action:
+          - kms:*
+          Effect: Allow
+          Principal:
+            AWS:
+              Fn::Join:
+              - ':'
+              - - 'arn:aws:iam:'
+                - Ref: AWS::AccountId
+                - root
+          Resource: '*'
+          Sid: Enable IAM User Permissions
+        Version: '2012-10-17'
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub:
+          - ${AWS::StackName}-${Name}
+          - Name: SSM-KMS-KEY
+    Type: AWS::KMS::Key
+  EncryptionKeyAlias:
+    Properties:
+      AliasName: alias/RDSMasterKey
+      TargetKeyId:
+        Ref: EncryptionKey
+    Type: AWS::KMS::Alias
+  GeneratePasswordLambda:
+    DependsOn: SSMParameter
+    Properties:
+      CodeUri: s3://pavelyarema-public/0bb697601b5772c364bd1d4a354e1b7a
+      Description: Lambda Function that will generate random passwords
+      FunctionName: GeneratePasswordLambda
+      Handler: generate-password-lambda.handler
+      MemorySize: 128
+      Role:
+        Fn::GetAtt:
+        - LambdaExecutionRole
+        - Arn
+      Runtime: python3.6
+      Timeout: 65
+    Type: AWS::Serverless::Function
+  GetPasswordLambda:
+    Properties:
+      CodeUri: s3://pavelyarema-public/0bb697601b5772c364bd1d4a354e1b7a
+      Description: Lambda Function that will retrieve password from encrypted SSM
+        parameter.
+      FunctionName: GetPasswordLambda
+      Handler: get-password-lambda.handler
+      MemorySize: 128
+      Role:
+        Fn::GetAtt:
+        - LambdaExecutionRole
+        - Arn
+      Runtime: python3.6
+      Timeout: 10
+    Type: AWS::Serverless::Function
+  InvokeGeneratePasswordLambda:
+    DeletionPolicy: Retain
+    DependsOn: EncryptionKey
+    Properties:
+      KeyID:
+        Ref: EncryptionKey
+      ParameterName:
+        Ref: SSMParameterName
+      ServiceToken:
+        Fn::GetAtt:
+        - GeneratePasswordLambda
+        - Arn
+    Type: AWS::CloudFormation::CustomResource
+    Version: '1.0'
+  InvokeGetPasswordLambda:
+    DeletionPolicy: Retain
+    DependsOn: InvokeGeneratePasswordLambda
+    Properties:
+      ParameterName:
+        Ref: SSMParameterName
+      ServiceToken:
+        Fn::GetAtt:
+        - GetPasswordLambda
+        - Arn
+    Type: AWS::CloudFormation::CustomResource
+    Version: '1.0'
+  LambdaExecutionRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Path: /
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - ssm:GetParameters
+            - ssm:GetParameter
+            - ssm:PutParameter
+            Effect: Allow
+            Resource:
+              Fn::Join:
+              - ':'
+              - - arn:aws:ssm
+                - Ref: AWS::Region
+                - Ref: AWS::AccountId
+                - Fn::Sub: parameter/${SSMParameterName}
+          Version: '2012-10-17'
+        PolicyName: SSM-Master-Password-Parameter-Access
+      RoleName:
+        Ref: IAMRoleName
+    Type: AWS::IAM::Role
+  RDSInstance:
+    DependsOn: InvokeGeneratePasswordLambda
+    Properties:
+      Parameters:
+        AllocatedStorage:
+          Ref: AllocatedStorage
+        AllowMajorVersionUpgrade:
+          Ref: AllowMajorVersionUpgrade
+        AutoMinorVersionUpgrade:
+          Ref: AutoMinorVersionUpgrade
+        BackupRetentionPeriod:
+          Ref: BackupRetentionPeriod
+        DBInstanceClass:
+          Ref: DBInstanceClass
+        DBName:
+          Ref: DBName
+        DBSubnetGroupName:
+          Ref: DBSubnetGroupName
+        Engine:
+          Ref: Engine
+        MasterUserPassword:
+          Fn::GetAtt:
+          - InvokeGetPasswordLambda
+          - Data
+        MasterUsername:
+          Ref: MasterUsername
+        MultiAZ:
+          Ref: MultiAZ
+        VPCSecurityGroups:
+          Ref: VPCSecurityGroups
+      TemplateURL: https://s3-us-west-2.amazonaws.com/pavelyarema-public/c6cde57b9829049eea9c9fbb9d6709c2.template
+      TimeoutInMinutes: 30
+    Type: AWS::CloudFormation::Stack
+  RDSMasterKeyUsagePolicy:
+    Properties:
+      ManagedPolicyName:
+        Ref: IAMManagedPolicyName
+      PolicyDocument:
+        Statement:
+        - Action:
+          - kms:Encrypt
+          - kms:Decrypt
+          - kms:ReEncrypt*
+          - kms:GenerateDataKey*
+          - kms:DescribeKey
+          Effect: Allow
+          Resource:
+            Fn::GetAtt:
+            - EncryptionKey
+            - Arn
+          Sid: AllowUseOfKey
+        Version: '2012-10-17'
+      Roles:
+      - Ref: LambdaExecutionRole
+    Type: AWS::IAM::ManagedPolicy
+  SSMParameter:
+    Properties:
+      Description: String
+      Name:
+        Ref: SSMParameterName
+      Type: String
+      Value: TempValue
+    Type: AWS::SSM::Parameter
+Transform: AWS::Serverless-2016-10-31

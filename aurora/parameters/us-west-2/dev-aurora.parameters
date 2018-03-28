@@ -1,0 +1,12 @@
+AllowMajorVersionUpgrade=false
+AutoMinorVersionUpgrade=true
+BackupRetentionPeriod=1
+DBInstanceClass=db.t2.medium
+DBName=DBTest
+DBClusterIdentifier=auroratest
+Engine=aurora
+DBSubnetGroupName=default-vpc-85fe97e3
+VPCSecurityGroups=sg-dfca07a2,sg-a7c805da
+MasterUsername=Pavel
+IAMRoleName=RDS-Starter-Template-LambdaExecutionRole
+IAMManagedPolicyName=GrantUsageKMS

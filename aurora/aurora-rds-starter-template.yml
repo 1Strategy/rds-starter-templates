@@ -13,6 +13,7 @@
 #    limitations under the License.
 ---
 AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
 Description: 'This template allows to provision RDS instances securely by creating
 an encrypted SSM parameter to store the RDS instance password. The password is randomly generated using a lambda function.'
 
@@ -86,10 +87,6 @@ Parameters:
     Description: Name of the IAM policy that will be created that allows users to decrypt SSM RDS Master password parameter. 
     Type: String
 
-  RDSInstanceTemplateURL:
-    Description: RDS Instance Nested Stack Template URL
-    Type: String
-
 
 Resources:
   RDSInstance:
@@ -108,7 +105,7 @@ Resources:
             MasterUsername: !Ref MasterUsername
             MasterUserPassword: !GetAtt InvokeGetPasswordLambda.Data
           
-      TemplateURL: !Ref RDSInstanceTemplateURL
+      TemplateURL: ./aurora-rds-instance.yml
       #TimeoutInMinutes will fail the stack creation if this nested stack is not completed in the amount of minutes specified.
       TimeoutInMinutes: 45
     DependsOn: InvokeGeneratePasswordLambda 
@@ -175,179 +172,29 @@ Resources:
         - !Ref LambdaExecutionRole
 
   GeneratePasswordLambda:
-    Type: "AWS::Lambda::Function"
+    Type: AWS::Serverless::Function
     Properties: 
-      Code:
-        ZipFile: |
-          import json
-          import cfnresponse
-          import random
-          import boto3
-          import logging
-          import traceback
-          from time import sleep
-
-          def passwordgenerator():
-            try:
-              s = "abcdefghijklmnopqrstuvwxyz01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ!#$%^&*()?"
-              passlen = 25
-              p =  "".join(random.sample(s,passlen ))
-              print ("Password Successfully Generated")
-              return p
-            
-            except Exception as e:
-              raise
-            
-            
-
-          def write2ssm(parameter_name, value, key):
-            try:
-              client = boto3.client('ssm')
-            
-              print ("Writing password to parameter specified.")
-              response = client.put_parameter(
-                Name= parameter_name,
-                Value= value,
-                Type='SecureString',
-                KeyId= key,
-                Overwrite=True,
-                AllowedPattern="^[^\\/\"@]{8,}$"
-                )
-            except Exception as e:
-              raise
-
-          def handler(event, context):
-            try:
-              parameterName = (event['ResourceProperties']['ParameterName'])
-              keyId = (event['ResourceProperties']['KeyID'])
-              # Generate password
-              password = passwordgenerator()
-              
-              sleep(45) # Waiting 45 seconds to ensure IAM Permissions were properly propagated. 
-    
-              # Write password to SSM 
-              write2ssm(parameterName, password, keyId)
-              
-              responseData = {}
-              
-              responseData['Data'] = "Success"
-              cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, "CustomResourcePhysicalID")
-
-            except Exception as e:
-              logging.error(traceback.format_exc())
-              responseData = {}
-              responseData['Error'] = "Lambda Function was unable to successfully generate a password and place it in a SSM parameter"
-              cfnresponse.send(event, context, cfnresponse.FAILED, responseData, "CustomResourcePhysicalID")
-              raise
-
       Description: Lambda Function that will generate random passwords
       FunctionName: GeneratePasswordLambda
-      Handler: index.handler
+      CodeUri: .
+      Handler: generate-password-lambda.handler
       MemorySize: 128 #Minimum allowed vlaue. No reason for this lambda function to use more than 128MB.
       Role: !GetAtt LambdaExecutionRole.Arn
       Runtime: python3.6
       Timeout: 65
-      Tags:
-        - Key: Name
-          Value: !Sub
-            - ${AWS::StackName}-${Name}
-            - { Name: GeneratePasswordLambda }
     DependsOn: SSMParameter
 
   GetPasswordLambda:
-    Type: "AWS::Lambda::Function"
+    Type: AWS::Serverless::Function
     Properties: 
-      Code:
-        ZipFile: |
-          import json
-          import boto3
-          import logging
-          import traceback
-          from botocore.vendored import requests
-
-          SUCCESS = "SUCCESS"
-          FAILED = "FAILED"
-
-          def getssmparameter(parameter_name):
-            try:
-              client = boto3.client('ssm')
-              
-              print ("Getting password from parameter specified.")
-              response = client.get_parameter(
-              Name= parameter_name,
-              WithDecryption=True
-              )
-              
-              return response
-            
-            except Exception as e:
-              raise
-
-          def handler(event, context):
-            try:
-              parameterName = (event['ResourceProperties']['ParameterName'])
-              
-              # Get password from SSM 
-              response = getssmparameter(parameterName)
-              
-            
-              responseData = {}
-              
-              responseData['Data'] = response['Parameter']['Value']
-              send(event, context, SUCCESS, responseData, "CustomResourcePhysicalID",noEcho=True) #Need to remove sensitive data from logs
-
-            except Exception as e:
-              logging.error(traceback.format_exc())
-              responseData = {}
-              responseData['Error'] = "Lambda Function was unable to successfully retrieve the password from the SSM parameter"
-              send(event, context, FAILED, responseData, "CustomResourcePhysicalID")
-              raise
-
-
-          def send(event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False):
-              responseUrl = event['ResponseURL']
-
-              print(responseUrl)
-
-              responseBody = {}
-              responseBody['Status'] = responseStatus
-              responseBody['Reason'] = 'See the details in CloudWatch Log Stream: ' + context.log_stream_name
-              responseBody['PhysicalResourceId'] = physicalResourceId or context.log_stream_name
-              responseBody['StackId'] = event['StackId']
-              responseBody['RequestId'] = event['RequestId']
-              responseBody['LogicalResourceId'] = event['LogicalResourceId']
-              responseBody['NoEcho'] = noEcho
-              responseBody['Data'] = responseData
-
-              json_responseBody = json.dumps(responseBody)
-
-              # print("Response body:\n" + json_responseBody)
-
-              headers = {
-                  'content-type' : '',
-                  'content-length' : str(len(json_responseBody))
-              }
-
-              try:
-                  response = requests.put(responseUrl,
-                                          data=json_responseBody,
-                                          headers=headers)
-                  print("Status code - " + response.reason)
-              except Exception as e:
-                  print("send(..) failed executing requests.put(..) -" + str(e))
-
       Description: Lambda Function that will retrieve password from encrypted SSM parameter.
       FunctionName: GetPasswordLambda
-      Handler: index.handler
+      CodeUri: .
+      Handler: get-password-lambda.handler
       MemorySize: 128 #Minimum allowed vlaue. No reason for this lambda function to use more than 128MB.
       Role: !GetAtt LambdaExecutionRole.Arn
       Runtime: python3.6
       Timeout: 10
-      Tags:
-        - Key: Name
-          Value: !Sub
-            - ${AWS::StackName}-${Name}
-            - { Name: GetPasswordLambda }
 
   EncryptionKey:
     Type: "AWS::KMS::Key"

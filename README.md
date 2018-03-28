@@ -22,7 +22,7 @@ To deploy this AWS RDS template, you'll need to provide several parameters depen
 | BackupRetentionPeriod    | The number of days during which automatic DB snapshots are retained. |      7      | Yes | Yes | Yes |
 | DBInstanceClass   | The name of the compute and memory capacity classes of the DB instance.   |  db.t2.medium  | Yes | Yes | Yes |
 | DBName   | The name of the database inside the instance.    |     mysqldb     | Yes | No | Yes |
-| DBClusterIdentifier   | Name of the database cluster.  |      auroracluster      | No | No | Yes |
+| DBClusterIdentifier   | Name of the database cluster.  |      auroracluster      | Yes | No | No |
 | Engine   | The name of the database engine to be used for this instance. |      mysql      | Yes | Yes | Yes |
 | DBSubnetGroupName   | A DB subnet group to associate with the DB instance.    |      default-vpc-85fe97e3      | Yes | Yes | Yes |
 | VPCSecurityGroups   | Specifies if the database instance is a multiple Availability Zone deployment.  |      sg-dfca07a2, sg-a7c805da      | Yes | Yes | Yes |
@@ -48,27 +48,38 @@ NOTE: The following shows how to deploy open-source RDS instance but the process
 ### Prerequisites
 
 1) If you'd like to deploy this stack via the command line, you'll need the AWS CLI.
-2) The appropriate rds-instance.yml has to be stored in a publicly accessible S3 bucket since the rds-starter-template.yml will need to reference the template. For example, if you are provisioning a mysql rds instance, upload the opensource-rds-instance.yml to a publically accessible s3 location. The url of the opensource-rds-instance.yml file will be placed in the RDSInstanceTemplateURL parameter in the opensource-rds-starter-template.yml CloudFormation template.  
+2) Create or identify an S3 bucket that can be utilized to store cloudformation artifacts. 
 
+### Package Solution 
+You will need to first package the cloudfomration template since it is using serverless-application-model (SAM). An already provisioned S3 bucket has to be specified in order to have a place to store CloudFormation artifacts. More details here: https://github.com/awslabs/serverless-application-model/blob/master/HOWTO.md
+ ```shell
+aws cloudformation package --template-file ./opensource-rds-starter-template.yml --s3-bucket  pavelyarema-s3bucket --output-template-file ./packaged-opensource-rds-starter-template.yml
+ ```
+
+Once packaged, the rest of the commands should be referencing the newly generated "packaged" CloudFormation template. 
 
 ### Validate/Lint Stack
 
 ```shell
-aws cloudformation validate-template --template-body file://opensource-rds-starter-template.yml
+aws cloudformation validate-template --template-body file://packaged-opensource-rds-starter-template.yml
 ```
 
 ### Deploy Stack
 
-You will need to verify you have the appropriate parameters file for the AWS Region and account/environment you want to deploy to. See `./parameters/<region>/<acct>.json`. For example `parameters/us-west-2/dev.json`.
+You will need to verify you have the appropriate parameters file for the AWS Region and account/environment you want to deploy to. See `./parameters/<region>/<acct>.parameters`. For example `parameters/us-west-2/dev.parameters`.
 
 ```shell
-aws cloudformation create-stack --template-body file://opensource-rds-starter-template.yml --stack-name rdsmysql --parameters file://parameters/us-west-2/dev.json
+aws cloudformation deploy --template-file ./packaged-opensource-rds-starter-template.yml --stack-name sam --parameter-overrides $(cat ./parameters/us-west-2/dev.parameters)  --capabilities CAPABILITY_NAMED_IAM
 ```
 
 ### Update Stack
 
+To update the stack, repackage the cloudformation template and the run the "aws cloudformation deploy" command again. 
+
 ```shell
-aws cloudformation update-stack --template-body file://opensource-rds-starter-template.yml --stack-name rdsmysql --parameters file://parameters/us-west-2/dev.json
+aws cloudformation package --template-file ./opensource-rds-starter-template.yml --s3-bucket  pavelyarema-s3bucket --output-template-file ./packaged-opensource-rds-starter-template.yml
+
+aws cloudformation deploy --template-file ./packaged-opensource-rds-starter-template.yml --stack-name sam --parameter-overrides $(cat ./parameters/us-west-2/dev.parameters)  --capabilities CAPABILITY_NAMED_IAM
 ```
 
 ## Template Outputs/Exports
